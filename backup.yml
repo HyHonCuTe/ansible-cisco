@@ -1,0 +1,13 @@
+- name: Backup switch config
+  hosts: switches
+  gather_facts: no
+  tasks:
+    - name: Get running-config
+      ios_command:
+        commands: show running-config
+      register: result
+
+    - name: Save config to file
+      copy:
+        content: "{{ result.stdout[0] }}"
+        dest: "backup_config/{{ inventory_hostname }}_running-config.txt"

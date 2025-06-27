@@ -1,0 +1,13 @@
+---
+- name: Push config files to switches
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+
+  tasks:
+    - name: Load configuration from file
+      ios_config:
+        src: "configs/{{ inventory_hostname }}.txt"
+    - name: Save running config to startup
+      ios_command:
+        commands: write memory

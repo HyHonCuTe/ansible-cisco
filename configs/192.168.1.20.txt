@@ -1,0 +1,15 @@
+vlan 10
+ name USERS
+
+vlan 20
+ name SERVERS
+
+interface Ethernet0/2 
+ switchport trunk allowed vlan 10,20
+ spanning-tree portfast trunk
+
+interface Ethernet0/1
+ switchport mode access
+ switchport access vlan 10
+
+spanning-tree mode rapid-pvst
