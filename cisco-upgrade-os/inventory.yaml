@@ -1,0 +1,11 @@
+[switches]
+192.168.1.1
+
+[switches:vars]
+ansible_connection=network_cli
+ansible_network_os=ios
+ansible_user=admin
+ansible_password=cisco123
+ansible_become=yes
+ansible_become_method=enable
+ansible_command_timeout=1800  # Tăng thời gian chờ lên 30 phút

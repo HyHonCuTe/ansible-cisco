@@ -1,0 +1,159 @@
+# - name: Cập nhật OS cho switch 
+#   hosts: switches
+#   gather_facts: no
+#   connection: network_cli
+
+#   vars:
+#     os_image: c2960l-universalk9-mz.152-7.E12.bin
+#     os_image_path: flash:/c2960l-universalk9-mz.152-7.E12.bin
+
+#   tasks:
+
+#     - name: Lấy thông tin hệ điều hành hiện tại BEFORE UPDATE
+#       cisco.ios.ios_facts:
+#       register: thong_tin_os
+
+
+#     - name: Hiển thị version
+#       debug:
+#         var: thong_tin_os.ansible_facts.ansible_net_version
+
+
+#     - name: Sao lưu cấu hình chạy hiện tại
+#       cisco.ios.ios_config:
+#         backup: yes
+#       register: backup_kq
+
+#     - name: Hiển thị file backup
+#       debug:
+#         var: backup_kq.backup_path
+
+#     - name: Copy file OS về flash
+#       net_put:
+#         src: "file/c2960l-universalk9-mz.152-7.E12.bin"
+#         dest: "flash:/c2960l-universalk9-mz.152-7.E12.bin"
+#       vars:
+#         ansible_command_timeout: 600   
+    
+    
+#     - name: Xóa boot cũ, đặt boot mới
+#       cisco.ios.ios_config:
+#         lines:
+#           - "no boot system"
+#           - "boot system flash:{{ os_image }}"
+#         save_when: always
+
+#     - name: Reload switch
+#       cli_command:
+#         command: reload
+#         prompt: "Proceed with reload"
+#         answer: "yes"
+#       ignore_errors: yes
+
+
+#     - name: Chờ switch khởi động lại (300 giây)
+#       pause:
+#         seconds: 300
+
+#     - name: Xác nhận boot image sau reload
+#       cisco.ios.ios_facts:
+#       register: thong_tin_os_sau
+
+#     - name: Hiển thị thông tin OS sau reload
+#       debug:
+#         var: thong_tin_os_sau.ansible_facts.ansible_net_image
+
+
+#     - name: Lấy thông tin hệ điều hành hiện tại AFTER UPDATE
+#       cisco.ios.ios_facts:
+#       register: thong_tin_os
+
+
+#     - name: Hiển thị version
+#       debug:
+#         var: thong_tin_os.ansible_facts.ansible_net_version
+
+
+- name: Cập nhật OS cho switch 
+  hosts: switches
+  gather_facts: no
+  connection: network_cli
+
+  vars:
+    os_image_file: c2960l-universalk9-mz.152-7.E12.bin
+    os_image_flash_path: "flash:/{{ os_image_file }}"
+    os_image_local_path: "file/{{ os_image_file }}"
+    reload_timeout: 300
+
+  tasks:
+
+    - name: Lấy thông tin hệ điều hành hiện tại BEFORE UPDATE
+      cisco.ios.ios_facts:
+      register: thong_tin_os
+
+    - name: Hiển thị version hiện tại
+      debug:
+        var: thong_tin_os.ansible_facts.ansible_net_version
+
+    - name: Sao lưu cấu hình chạy hiện tại
+      cisco.ios.ios_config:
+        backup: yes
+      register: backup_kq
+
+    - name: Hiển thị file backup
+      debug:
+        var: backup_kq.backup_path
+
+    - name: Copy file OS về flash
+      net_put:
+        src: "{{ os_image_local_path }}"
+        dest: "{{ os_image_flash_path }}"
+      vars:
+        ansible_command_timeout: 600   
+
+    
+
+
+    - name: Lấy thông tin thiết bị
+      cisco.ios.ios_facts:
+      register: thong_tin_os
+
+    - name: Boot cho IOS XE
+      when: "'XE' in thong_tin_os.ansible_facts.ansible_net_version"
+      cisco.ios.ios_config:
+        lines:
+          - boot system flash:packages.conf
+
+    - name: Boot cho IOS thường
+      when: "'XE' not in thong_tin_os.ansible_facts.ansible_net_version"
+      cisco.ios.ios_config:
+        lines:
+          - "no boot system"
+          - "boot system {{ os_image_flash_path }}"
+        save_when: always
+
+
+    - name: Reload switch
+      cli_command:
+        command: reload
+        prompt: "Proceed with reload"
+        answer: "yes"
+      ignore_errors: yes
+
+    - name: Chờ switch khởi động lại ({{ reload_timeout }} giây)
+      pause:
+        seconds: "{{ reload_timeout }}"
+
+    - name: Lấy thông tin OS sau reload
+      cisco.ios.ios_facts:
+      register: thong_tin_os_sau
+
+    - name: Hiển thị boot image sau reload
+      debug:
+        var: thong_tin_os_sau.ansible_facts.ansible_net_image
+
+    - name: Hiển thị version sau reload
+      debug:
+        var: thong_tin_os_sau.ansible_facts.ansible_net_version
+
+
