@@ -1,0 +1,76 @@
+# Get information about the device
+- name: Get device information
+  cisco.ios.ios_command:
+    commands:
+      - show version
+      - show ip interface brief
+  register: device_info
+
+- name: Display device information
+  debug:
+    var: device_info
+    verbosity: 2
+    msg: "{{ device_info }}"
+
+
+
+# config vlan 
+- name: Configure VLAN
+  cisco.ios.ios_config:
+    lines:
+      - vlan 10
+      - name VLAN_10
+    save_when: modified
+  register: vlan_config
+
+# config advanced features
+- name: Configure advanced features
+  cisco.ios.ios_config:
+    lines:
+      - interface GigabitEthernet0/1
+      - description Uplink to Core Switch
+      - switchport mode trunk
+      - switchport trunk allowed vlan 10
+    save_when: modified
+  register: advanced_features_config
+
+# config NAT
+- name: Configure NAT
+  cisco.ios.ios_config:
+    lines:
+      - ip nat inside source list 1 interface GigabitEthernet0/1 overload
+      - access-list 1 permit 192.168.1.0 0.0.0.255
+    save_when: modified
+  register: nat_config
+
+# config ACL standard
+- name: Configure ACL standard
+  cisco.ios.ios_config:
+    lines:
+      - access-list 10 permit 192.168.1.0 0.0.0.255
+    save_when: modified
+  register: acl_standard_config
+
+# config ACL extended
+- name: Configure ACL extended
+  cisco.ios.ios_config:
+    lines:
+      - access-list 100 permit ip 192.168.1.0 0.0.0.255 any
+    save_when: modified
+  register: acl_extended_config
+
+
+# config ssh
+- name: Configure SSH
+  cisco.ios.ios_config:
+    lines:
+      - ip domain-name example.com
+      - crypto key generate rsa
+      - username admin privilege 15 secret admin123
+      - line vty 0 4
+      - login local
+      - transport input ssh
+    save_when: modified
+  register: ssh_config
+
+
