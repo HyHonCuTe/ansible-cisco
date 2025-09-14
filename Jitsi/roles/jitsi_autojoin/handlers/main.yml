@@ -1,0 +1,11 @@
+---
+- name: Restart gdm
+  systemd:
+    name: gdm
+    state: restarted
+    daemon_reload: yes
+
+- name: Update dconf database
+  command: dconf update
+  args:
+    warn: false

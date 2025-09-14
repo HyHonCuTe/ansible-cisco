@@ -1,0 +1,35 @@
+# ---
+# - hosts: almalinux_clients
+#   become: yes
+#   vars:
+#     kiosk_user: kiosk
+#     jitsi_url: "https://dl.namtrung.net:10443/roomname#userInfo.displayName=%22AutoClient%22&config.startWithAudioMuted=false&config.startWithVideoMuted=false"
+#   roles:
+#     - jitsi_autojoin
+
+
+
+
+# [Desktop Entry]
+# Type=Application
+# # Force Firefox to use Xorg (disable Wayland for Firefox) and kiosk mode
+# Exec=/usr/bin/env MOZ_ENABLE_WAYLAND=0 firefox --kiosk "{{ jitsi_url }}"
+# Hidden=false
+# NoDisplay=false
+# X-GNOME-Autostart-enabled=true
+# Name=Jitsi Auto Join
+# Comment=Auto join Jitsi meeting at startup
+# Terminal=false
+# X-GNOME-Autostart-Delay=0
+
+
+
+
+
+
+- hosts: almalinux_clients
+  become: yes
+  vars:
+    kiosk_user: kiosk
+  roles:
+    - jitsi_autojoin

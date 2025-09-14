@@ -1,0 +1,4 @@
+[almalinux_clients]
+#10.10.1.92 ansible_user=root ansible_password=admin123 jitsi_url="https://dl.namtrung.net:10443/roomname#userInfo.displayName=%22Client2%22&config.startWithAudioMuted=false&config.startWithVideoMuted=false"
+#192.168.1.105 ansible_user=root ansible_password=admin123 jitsi_url="https://dl.namtrung.net:10443/roomname#userInfo.displayName=%22Client1%22&config.startWithAudioMuted=false&config.startWithVideoMuted=false"
+192.168.1.105 ansible_user=root ansible_password=admin123 jitsi_url="https://www.youtube.com/"

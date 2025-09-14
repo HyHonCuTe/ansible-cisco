@@ -1,0 +1,455 @@
+# # # ---
+# # # - name: Install required packages
+# # #   dnf:
+# # #     name:
+# # #       - firefox
+# # #       - dconf
+# # #       - xorg-x11-server-Xorg
+# # #     state: present
+# # #   become: yes
+
+# # # - name: Create user kiosk if missing
+# # #   user:
+# # #     name: "{{ kiosk_user }}"
+# # #     groups: wheel
+# # #     shell: /bin/bash
+# # #     create_home: yes
+
+# # # # --- GDM autologin + disable Wayland (required for Xorg options to work)
+# # # - name: Configure GDM auto-login and disable Wayland
+# # #   blockinfile:
+# # #     path: /etc/gdm/custom.conf
+# # #     create: yes
+# # #     marker: "# {mark} ANSIBLE Managed block for kiosk"
+# # #     block: |
+# # #       [daemon]
+# # #       AutomaticLoginEnable=True
+# # #       AutomaticLogin={{ kiosk_user }}
+# # #       # Force Xorg so X server options (DontVTSwitch) apply
+# # #       WaylandEnable=False
+# # #   notify: Restart gdm
+
+# # # # --- Xorg server flags (prevent VT switching and Ctrl+Alt+Backspace)
+# # # - name: Deploy Xorg ServerFlags to disable VT switching
+# # #   copy:
+# # #     dest: /etc/X11/xorg.conf.d/10-serverflags.conf
+# # #     content: |
+# # #       Section "ServerFlags"
+# # #           # Prevent switching to virtual consoles (Ctrl+Alt+Fx)
+# # #           Option "DontVTSwitch" "True"
+# # #           # Prevent Ctrl+Alt+Backspace (Zap)
+# # #           Option "DontZap" "True"
+# # #       EndSection
+# # #     owner: root
+# # #     group: root
+# # #     mode: '0644'
+# # #   notify: Restart gdm
+
+# # # # --- dconf system database: remove/lock dangerous keybindings
+# # # - name: Ensure dconf profile exists (system DB 'local' enabled)
+# # #   copy:
+# # #     dest: /etc/dconf/profile/user
+# # #     content: |
+# # #       user-db:user
+# # #       system-db:local
+# # #     owner: root
+# # #     group: root
+# # #     mode: '0644'
+
+# # # - name: Drop dconf settings to disable keybindings (system DB)
+# # #   copy:
+# # #     dest: /etc/dconf/db/local.d/00_kiosk
+# # #     content: |
+# # #       # Disable Alt+Tab / window switching and common media keys, screensaver lock, idle
+# # #       [org/gnome/desktop/wm/keybindings]
+# # #       switch-applications=[]
+# # #       switch-applications-backward=[]
+# # #       switch-windows=[]
+# # #       switch-windows-backward=[]
+# # #       switch-panels=[]
+
+# # #       [org/gnome/mutter]
+# # #       # disable overlay (Activities / Super) so Super doesn't open overview
+# # #       overlay-key=''
+
+# # #       [org/gnome/desktop/media-keys]
+# # #       # disable common media / shortcut keys
+# # #       screensaver=[]
+# # #       logout=[]
+# # #       home=[]
+# # #       www=[]
+# # #       terminal=[]
+
+# # #       [org/gnome/desktop/screensaver]
+# # #       lock-enabled=false
+# # #       idle-activation-enabled=false
+
+# # #       [org/gnome/desktop/session]
+# # #       idle-delay=uint32 0
+# # #     owner: root
+# # #     group: root
+# # #     mode: '0644'
+
+# # # - name: Lock the above dconf keys so users cannot re-enable
+# # #   copy:
+# # #     dest: /etc/dconf/db/local.d/locks/00_kiosk
+# # #     content: |
+# # #       /org/gnome/desktop/wm/keybindings/switch-applications
+# # #       /org/gnome/desktop/wm/keybindings/switch-applications-backward
+# # #       /org/gnome/desktop/wm/keybindings/switch-windows
+# # #       /org/gnome/desktop/wm/keybindings/switch-windows-backward
+# # #       /org/gnome/mutter/overlay-key
+# # #       /org/gnome/desktop/media-keys/screensaver
+# # #       /org/gnome/desktop/screensaver/lock-enabled
+# # #       /org/gnome/desktop/session/idle-delay
+# # #     owner: root
+# # #     group: root
+# # #     mode: '0644'
+# # #   notify: Update dconf database
+
+# # # # --- dconf update (compile system DB)
+# # # - name: Run dconf update (compile system database)
+# # #   command: dconf update
+# # #   args:
+# # #     warn: false
+# # #   notify: Restart gdm
+
+# # # # --- Autostart folder + deploy jitsi.desktop
+# # # - name: Create autostart folder for kiosk user
+# # #   file:
+# # #     path: "/home/{{ kiosk_user }}/.config/autostart"
+# # #     state: directory
+# # #     owner: "{{ kiosk_user }}"
+# # #     group: "{{ kiosk_user }}"
+# # #     mode: '0755'
+
+# # # - name: Deploy Jitsi autostart .desktop
+# # #   template:
+# # #     src: jitsi.desktop.j2
+# # #     dest: "/home/{{ kiosk_user }}/.config/autostart/jitsi.desktop"
+# # #     owner: "{{ kiosk_user }}"
+# # #     group: "{{ kiosk_user }}"
+# # #     mode: '0644'
+
+# # # # ensure home ownership consistent
+# # # - name: Ensure home ownership (kiosk)
+# # #   file:
+# # #     path: "/home/{{ kiosk_user }}"
+# # #     owner: "{{ kiosk_user }}"
+# # #     group: "{{ kiosk_user }}"
+# # #     recurse: yes
+
+
+# # #--------------------------------------------------------------------------------------------------------------------------------
+# #     - name: Install required packages
+# #       dnf:
+# #         name:
+# #           - firefox
+# #           - xorg-x11-server-Xorg
+# #           - xorg-x11-xinit
+# #         state: present
+
+# #     - name: Create kiosk user
+# #       user:
+# #         name: "{{ kiosk_user }}"
+# #         groups: wheel
+# #         shell: /bin/bash
+# #         create_home: yes
+
+# #     # --- GDM auto login (still required)
+# #     - name: Configure GDM auto-login (Xorg only)
+# #       blockinfile:
+# #         path: /etc/gdm/custom.conf
+# #         create: yes
+# #         marker: "# {mark} ANSIBLE Managed block for kiosk"
+# #         block: |
+# #           [daemon]
+# #           AutomaticLoginEnable=True
+# #           AutomaticLogin={{ kiosk_user }}
+# #           WaylandEnable=False
+# #       notify: Restart gdm
+
+# #     # --- Session file for kiosk
+# #     - name: Create Jitsi Kiosk Xsession
+# #       copy:
+# #         dest: /usr/share/xsessions/jitsi-kiosk.desktop
+# #         content: |
+# #           [Desktop Entry]
+# #           Name=Jitsi Kiosk
+# #           Comment=Firefox in kiosk mode for Jitsi
+# #           Exec=/usr/local/bin/start-jitsi-kiosk.sh
+# #           Type=Application
+# #           DesktopNames=JitsiKiosk
+# #         owner: root
+# #         group: root
+# #         mode: '0644'
+
+# #     # --- Script to launch Firefox kiosk
+# #     - name: Create start script for kiosk session
+# #       copy:
+# #         dest: /usr/local/bin/start-jitsi-kiosk.sh
+# #         content: |
+# #           #!/bin/bash
+# #           export MOZ_ENABLE_WAYLAND=0
+# #           exec firefox --kiosk "{{ jitsi_url }}"
+# #         owner: root
+# #         group: root
+# #         mode: '0755'
+
+# #     # --- Force kiosk session for the kiosk user
+# #     - name: Set default session for kiosk user
+# #       copy:
+# #         dest: "/var/lib/AccountsService/users/{{ kiosk_user }}"
+# #         content: |
+# #           [User]
+# #           XSession=jitsi-kiosk
+# #         owner: root
+# #         group: root
+# #         mode: '0644'
+
+# #     # --- Ensure home permissions correct
+# #     - name: Ensure home ownership (kiosk)
+# #       file:
+# #         path: "/home/{{ kiosk_user }}"
+# #         owner: "{{ kiosk_user }}"
+# #         group: "{{ kiosk_user }}"
+# #         recurse: yes
+
+# #   # handlers:
+# #   #   - name: Restart gdm
+# #   #     service:
+# #   #       name: gdm
+# #   #       state: restarted
+
+
+# #-----version chromium + xorg (no gdm)----------------------------------------------------------------------------------------------
+
+#     # --- Remove GNOME and GDM
+#     - name: Remove GNOME and GDM
+#       dnf:
+#         name:
+#           - gdm
+#           - gnome-shell
+#           - gnome-session*
+#           - gnome-classic-session
+#           - gnome-terminal
+#           - gnome-control-center
+#           - nautilus
+#         state: absent
+#         autoremove: yes
+
+#     # --- Enable CRB repo (AlmaLinux 9+)
+#     - name: Enable CRB repository (AlmaLinux 9+)
+#       command: dnf config-manager --set-enabled crb
+#       when: ansible_distribution_major_version | int >= 9
+
+#     - name: Install EPEL release
+#       dnf:
+#         name: epel-release
+#         state: present
+
+#     # --- Install Chromium + Xorg + deps
+#     - name: Install Chromium + Xorg + dependencies
+#       dnf:
+#         name:
+#           - chromium
+#           - xorg-x11-server-Xorg
+#           - xorg-x11-xinit
+#           - xorg-x11-utils
+#           - liberation-fonts
+#           - xorg-x11-fonts-Type1
+#           - xorg-x11-fonts-75dpi
+#           - alsa-lib
+#         state: present
+
+#     # --- Ensure kiosk user exists
+#     - name: Create kiosk user
+#       user:
+#         name: "{{ kiosk_user }}"
+#         shell: /bin/bash
+#         create_home: yes
+
+#     # --- Detect Chromium binary
+#     - name: Find chromium binary
+#       command: "bash -lc 'command -v chromium || command -v chromium-browser'"
+#       register: chromium_bin
+#       changed_when: false
+
+#     # --- ~/.xinitrc để Chromium tự start
+#     - name: Create .xinitrc for kiosk user
+#       copy:
+#         dest: "/home/{{ kiosk_user }}/.xinitrc"
+#         content: |
+#           #!/bin/bash
+#           LOGFILE="/home/{{ kiosk_user }}/kiosk.log"
+#           echo "Starting Chromium kiosk..." > "$LOGFILE" 2>&1
+#           echo "Using binary: {{ chromium_bin.stdout }}" >> "$LOGFILE"
+
+#           exec {{ chromium_bin.stdout }} \
+#             --no-first-run \
+#             --kiosk "{{ jitsi_url }}" \
+#             --start-fullscreen \
+#             --incognito \
+#             --disable-infobars \
+#             --overscroll-history-navigation=0 \
+#             >> "$LOGFILE" 2>&1
+#         owner: "{{ kiosk_user }}"
+#         group: "{{ kiosk_user }}"
+#         mode: '0755'
+
+#     # --- Systemd service
+#     - name: Create kiosk systemd service
+#       copy:
+#         dest: /etc/systemd/system/kiosk.service
+#         content: |
+#           [Unit]
+#           Description=Chromium Kiosk (Xorg only)
+#           After=systemd-user-sessions.service getty@tty1.service
+#           Conflicts=getty@tty1.service
+
+#           [Service]
+#           User={{ kiosk_user }}
+#           WorkingDirectory=/home/{{ kiosk_user }}
+#           PAMName=login
+#           TTYPath=/dev/tty1
+#           TTYReset=yes
+#           TTYVHangup=yes
+#           StandardInput=tty
+#           StandardOutput=tty
+#           StandardError=tty
+#           ExecStart=/usr/bin/xinit /home/{{ kiosk_user }}/.xinitrc -- :0 vt1 -nolisten tcp
+#           Restart=always
+#           Environment=DISPLAY=:0
+#           Environment=XAUTHORITY=/home/{{ kiosk_user }}/.Xauthority
+
+#           [Install]
+#           WantedBy=multi-user.target
+#         owner: root
+#         group: root
+#         mode: '0644'
+
+#     # --- Reload systemd and enable kiosk
+#     - name: Reload systemd and enable kiosk
+#       systemd:
+#         daemon_reload: yes
+#         name: kiosk.service
+#         enabled: yes
+#         state: started
+
+
+
+- name: Remove GNOME and GDM
+  dnf:
+    name:
+      - gdm
+      - gnome-shell
+      - gnome-session*
+      - gnome-classic-session
+      - gnome-terminal
+      - gnome-control-center
+      - nautilus
+    state: absent
+    autoremove: yes
+
+# Enable CRB repo (AlmaLinux 9+)
+- name: Enable CRB repository (AlmaLinux 9+)
+  command: dnf config-manager --set-enabled crb
+  when: ansible_distribution_major_version | int >= 9
+
+- name: Install EPEL release
+  dnf:
+    name: epel-release
+    state: present
+
+# Install Chromium + Xorg + xinit + matchbox WM
+- name: Install Chromium + Xorg
+  dnf:
+    name:
+      - chromium
+      - xorg-x11-server-Xorg
+      - xorg-x11-xinit
+      - matchbox-window-manager
+    state: present
+
+# Ensure kiosk user exists
+- name: Create kiosk user
+  user:
+    name: "{{ kiosk_user }}"
+    shell: /bin/bash
+    create_home: yes
+
+# Detect Chromium binary
+- name: Find chromium binary
+  command: "bash -lc 'command -v chromium || command -v chromium-browser'"
+  register: chromium_bin
+  changed_when: false
+
+# ~/.xinitrc để Chromium tự start (ép độ phân giải + fullscreen)
+- name: Create .xinitrc for kiosk user
+  copy:
+    dest: "/home/{{ kiosk_user }}/.xinitrc"
+    content: |
+      #!/bin/bash
+      LOGFILE="/home/{{ kiosk_user }}/kiosk.log"
+      echo "Starting Chromium kiosk..." > "$LOGFILE" 2>&1
+      echo "Using binary: {{ chromium_bin.stdout }}" >> "$LOGFILE"
+
+      # Ép độ phân giải màn hình (thay Virtual-1 bằng output từ `xrandr`)
+      xrandr --output Virtual-1 --mode 1920x1080
+
+      # Start lightweight WM
+      matchbox-window-manager -use_cursor no &
+
+      # Start Chromium fullscreen
+      exec {{ chromium_bin.stdout }} \
+        --no-first-run \
+        --kiosk "{{ jitsi_url }}" \
+        --start-fullscreen \
+        --window-position=0,0 \
+        --window-size=1920,1080 \
+        --incognito \
+        --disable-infobars \
+        --overscroll-history-navigation=0 \
+        >> "$LOGFILE" 2>&1
+    owner: "{{ kiosk_user }}"
+    group: "{{ kiosk_user }}"
+    mode: '0755'
+
+# Systemd service
+- name: Create kiosk systemd service
+  copy:
+    dest: /etc/systemd/system/kiosk.service
+    content: |
+      [Unit]
+      Description=Chromium Kiosk (Xorg only)
+      After=systemd-user-sessions.service getty@tty1.service
+      Conflicts=getty@tty1.service
+
+      [Service]
+      User={{ kiosk_user }}
+      WorkingDirectory=/home/{{ kiosk_user }}
+      PAMName=login
+      TTYPath=/dev/tty1
+      TTYReset=yes
+      TTYVHangup=yes
+      StandardInput=tty
+      StandardOutput=tty
+      StandardError=tty
+      ExecStart=/usr/bin/xinit /home/{{ kiosk_user }}/.xinitrc -- :0 vt1 -nolisten tcp
+      Restart=always
+      Environment=DISPLAY=:0
+      Environment=XAUTHORITY=/home/{{ kiosk_user }}/.Xauthority
+
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
+
+# Reload systemd and enable kiosk
+- name: Reload systemd and enable kiosk
+  systemd:
+    daemon_reload: yes
+    name: kiosk.service
+    enabled: yes
+    state: started

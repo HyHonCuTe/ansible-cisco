@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+# Chromium kiosk mode (force X11, fullscreen, incognito)
+Exec=/usr/bin/env chromium \
+  --kiosk "{{ jitsi_url }}" \
+  --start-fullscreen \
+  --incognito \
+  --no-first-run \
+  --disable-infobars \
+  --overscroll-history-navigation=0
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=Jitsi Auto Join
+Comment=Auto join Jitsi meeting at startup
+Terminal=false
+X-GNOME-Autostart-Delay=0
